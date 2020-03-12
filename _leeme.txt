@@ -1,0 +1,4 @@
+11/03/2020
+deriva de rbf pero solo idw
+incorpora selección de tipo de base de datos
+incorpora una clase
