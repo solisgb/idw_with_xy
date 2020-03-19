@@ -6,7 +6,7 @@ Created on 06/09/2019
 
 driver módulo interpol
 Antes de ejecutar la app asegúrate de que rellenas correctamente los valores
-    de las variables (argumentos de la clase y el método) en el módulo
+    de los parámetros que controlan la ejecución en el módulo
     interpolation_param
 Al finalizar la ejecución el programa crea el fichero app.log con las
     incidencias de la ejecución
@@ -27,12 +27,13 @@ if __name__ == "__main__":
         i = Interpolate(par.dbtype, par.db, par.select,
                  par.day1, par.month1, par.year1,
                  par.day2, par.month2, par.year2,
-                 par.time_step, par.no_value, par.date_format,
-                 par.float_format)
+                 par.time_step, par.no_value, par.float_format,
+                 par.variable_short_name, par.ylabel)
 
         i.idw_serie_temporal(par.pathin, par.fpoints, par.skip_lines,
-                             par.pathout, par.variable_short_name,
-                             par.kidw, par.poweridw, par.epsidw)
+                             par.pathout,
+                             par.kidw, par.poweridw, par.epsidw,
+                             par.xygraph)
 
         xtime = time() - startTime
         print(f'El script tardó {xtime:0.1f} s')
