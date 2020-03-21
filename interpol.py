@@ -20,6 +20,8 @@ import littleLogging as logging
 time_steps = ('day', 'lastday_month')
 # al interpolar series temporales imprime fecha cada
 PRINT_SECS: float = 5.
+# separador de columnas en el fichero de resultados
+COL_SEP = ';'
 
 
 class Interpolate():
@@ -47,16 +49,18 @@ class Interpolate():
             columnas: código de estación de tipo texto, text, varchar;
             fecha de medida; valor en la fecha
         select: select que devuelve los datos con los que se va a hacer la
-            interpolación; los nombres de las tablas pueden variar entre db
-            pero las columnas que tiene que devolver son x, y, valor, siendo
-            x, y las coordenadas de la estación de datos (proyectadas) y valor
-            el de la variable a interpolar; también debe contener una
-            claúsula where con la fecha como parámetro; el formato del
-            parámetro depende de la db: ms_access y sqlite es ?; postgres es %s
-            los nombres de las columnas no importan
+            interpolación; los nombres de las tablas y las columnas pueden
+            variar entre db pero las columnas que tiene que devolver son
+            x, y, valor, siendo x, y las coordenadas de la estación de datos
+            (en coordenadas proyectadas) y valor el de la variable a
+            interpolar; esats 3 columnas debe ser de tipo eal;también debe
+            contener una claúsula where con la fecha como parámetro;
+            el formato del parámetro depende de la db: ms_access y sqlite es ?;
+            postgres es %s. los nombres de las columnas no importan
             La tabla de datos debe ser una tabla temporal con un código de
-                estación, una fecha y un valor; para series mensuales el
-                valor se graba en la última fecha del mes
+                estación de tipo texto, varchar, etc, una fecha y un valor;
+                para series mensuales el valor se graba en la última fecha del
+                mes
         day1, month1, year1: fecha inicial de la importación
         day2, month2, year2: fecha final de la importación
         time_step: paso de tiempo de la serie a interpolar. Puede ser day o
@@ -98,8 +102,8 @@ class Interpolate():
         """
         Método de interpolación inverse distance weighted con distance elevada
             a una potencia, normalmente 2
-        Interpola la variable en una serie de puntos dados en 3D. Si no tienes
-            valor de Z pon en todos los puntos un valor cte, por ej 0
+        Interpola la variable en una serie de puntos dados en 2D (recomendado)
+            o 3D
         Los datos son una serie temporal; los puntos con datos varían en el
             tiempo
         argumentos
@@ -110,12 +114,12 @@ class Interpolate():
                 columnas 2 y 3: coordenadas x e y
                 columna 4 (opcional): coordenada z
             El separador decimal es el punto, por ej. 1.2 y no debe haber
-            separadores de miles, por ej. 1000.3. El separador de columnas es
-            el tabulador.
-        skip_lines: número de lineas en el fichero de puntos a interpolar que
-            no se leen (cabecera, normalmente 1)
+            separadores de miles, por ej. 1000.3.
+            El separador de columnas es el tabulador.
             Si el fichero tiene 4 columnas el programa entiende que es una
             interpolación 3D; si tiene 2 columnas será una interpolación en 2D
+        skip_lines: número de lineas en fpoints que no se leen
+            (cabecera, normalmente 1 línea)
         pathout: directorio donde se grabarán los datos interpolados
         kidw: número de puntos con los que se realiza la interpolación (min 2)
         power: potencia en el método idw (1/dist**power); normalmente 2.
@@ -144,20 +148,15 @@ class Interpolate():
 
         start_time = time()
 
-        con, f = None, None
-
         # datos donde hay que interpolar
         rows = Interpolate.__points2interpolate_get(join(pathin, fpoints),
                                                     skip_lines)
-        fidi = rows[:, 0]  # array con los id de los puntos
-        if rows.shape[1] == 3:  # 2D
-            xi = rows[:, [1, 2]].astype(np.float32)  # array con las coord.
-        elif rows.shape[1] == 4:  #3D
-            xi = rows[:, [1, 2, 3]].astype(np.float32)
-        else:
-            raise ValueError('El núm de columnas en el fichero de puntos ' +\
-                             'debe 3 o 4: id del punto, x, y, (z)')
-        rows = None
+        # array con los id de los puntos
+        fidi = rows[:, 0]
+        # array con las coord. (dim depende de num. cols. in rows)
+        xi = Interpolate.__xi_get(rows)
+        icols = [i for i in range(xi.shape[1]+1) ]
+
         # array para los valores interpolados
         zi = np.empty((len(xi)), np.float32)
 
@@ -165,65 +164,81 @@ class Interpolate():
         con = con_get(self.dbtype, self.db)
         cur = con.cursor()
 
-        # cursor para los datos para los gráficos de evolución
+        # cursor para los valores interpolados
         con1 = sqlite3.connect(':memory:')
         cur1 = con1.cursor()
         cur1.execute(create_table1)
 
-        # fichero de salida
-        dst = Interpolate.__file_name_out(pathout, fpoints,
-                                          self.variable_short_name, 'idw')
-        f = open(dst, 'w')
-        f.write('fid\tfecha\tvalor\n')
-        cadena = '{}\t{}\t{:' + self.float_format + '}\n'
-
         t0 = PRINT_SECS
         datei = self.datei
         while datei <= self.datefin:
+            zi.fill(self.no_value)
             date_str = datei.strftime(self.date_format)
             if time() - t0 > PRINT_SECS:
                 t0 = time()
                 print(date_str)
             cur.execute(self.select, (datei,))
             data = [row for row in cur]
-            if xi.shape[1] == 2:
-                data = np.array([[row[0], row[1], row[2]] for row in data])
-                tree = spatial.cKDTree(data[:, [0, 1]])
-            else:
-                data = np.array([[row[0], row[1], row[2], row[3]] \
-                                  for row in data])
-                tree = spatial.cKDTree(data[:, [0, 1, 2]])
+            if not data:
+                logging.append(f'{date_str} no data', False)
+                datei = self.__next_date(datei)
+                continue
+            data = np.array([[row[jcol] for jcol in icols] for row in data])
+            tree = spatial.cKDTree(data[:, icols[0:-1]])
             dist, ii = tree.query(xi, k=kidw)
-
-            zi.fill(self.no_value)
             Interpolate.__idwcore(data[:, xi.shape[1]], dist, ii, power,
-                                    epsidw, zi)
-
+                                  epsidw, zi)
+            v = [float(z1) for z1 in zi]
             for i in range(len(fidi)):
-                f.write(cadena.format(fidi[i], date_str, zi[i]))
-                cur1.execute(insert1, (fidi[i], date_str, zi[i]))
+                cur1.execute(insert1, (fidi[i], date_str, v[i]))
 
-            con1.commit()
-            if self.tstep_type == 1:
-                datei = datei + self.time_step
-            elif self.tstep_type == 2:
-                datei = Interpolate.__addmonth_lastday(datei)
-            else:
-                f.close()
-                con.close()
-                raise ValueError(f'tstep_type {self.tstep_type} ' +\
-                                 'no implementado')
+            datei = self.__next_date(datei)
 
-        f.close()
         con.close()
         elapsed_time = time() - start_time
         print(f'La interpolación tardó {elapsed_time:0.1f} s')
+
+        con1.commit()
+        self.__write_interpolated_values(pathout, fpoints, cur1)
 
         self.__write_idw_metadata(pathout, fpoints, power, kidw,
                                   epsidw, fidi.size, elapsed_time)
 
         if xygraph:
             self.__xy(pathout, cur1)
+
+
+    @staticmethod
+    def __xi_get(rows: list) -> np.array:
+        """
+        extrae el array de coordenadas: su dimensión depende de las de rows
+        """
+        if rows.shape[1] == 3:  # 2D
+            xi = rows[:, [1, 2]].astype(np.float32)
+        elif rows.shape[1] == 4:  #3D
+            xi = rows[:, [1, 2, 3]].astype(np.float32)
+        else:
+            raise ValueError('El núm de columnas en el fichero de puntos ' +\
+                             'debe 3 o 4: id del punto, x, y, (z)')
+        return xi
+
+
+    def __next_date(self, datei):
+        """
+        incrementa el valor de date en cada fecha de interpolación
+        args:
+        datei: obj date a incrementar
+        returns
+        date object
+        """
+        if self.tstep_type == 1:
+            datei = datei + self.time_step
+        elif self.tstep_type == 2:
+            datei = Interpolate.__addmonth_lastday(datei)
+        else:
+            raise ValueError(f'tstep_type {self.tstep_type} ' +\
+                             'no implementado')
+        return datei
 
 
     @staticmethod
@@ -314,6 +329,27 @@ class Interpolate():
         return date(year, month, day)
 
 
+    def __write_interpolated_values(self, pathout: str, fpoints: str, cur1):
+        """
+        escribe los valores interpolados en el fichero dst
+        args
+        cur1: cursor a una db sqlite
+        """
+        select1 = \
+        'select fid, fecha, value from interpolated order by fid, fecha;'
+
+        dst = Interpolate.__file_name_out(pathout, fpoints,
+                                          self.variable_short_name, 'idw')
+        f = open(dst, 'w')
+        f.write(f'fid{COL_SEP}fecha{COL_SEP}valor\n')
+        cadena = '{}' + COL_SEP + '{}' + COL_SEP + \
+        '{:' + self.float_format + '}\n'
+        cur1.execute(select1)
+        for row in cur1.fetchall():
+            f.write(cadena.format(row[0], row[1], row[2]))
+        f.close()
+
+
     def __xy(self, pathout: str, cur1):
         from os.path import join
         """
@@ -321,6 +357,8 @@ class Interpolate():
         args
         cur1: objeto sqlite cursor
         """
+        from datetime import datetime
+
         select = \
         'select fid from interpolated group by fid order by fid;'
 
@@ -333,7 +371,8 @@ class Interpolate():
             fid = str(fid)
             cur1.execute(select1, (fid,))
             data = [[row[0], row[1]] for row in cur1.fetchall()]
-            fechas = [row[0] for row in data]
+            fechas = [datetime.strptime(row[0], self.date_format).date()
+                      for row in data]
             values = [row[1] for row in data]
             title = f'Punto interpolado {fid}'
             dst = join(pathout, fid+self.variable_short_name+'.png')

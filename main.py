@@ -49,3 +49,4 @@ if __name__ == "__main__":
         logging.append(f'Exception\n{msg}')
     finally:
         logging.dump()
+        print('se ha creado el fichero app.log')
