@@ -36,10 +36,11 @@ select = \
 select e.x_utm , e.y_utm , p.precip
 from met.cl_est_climat e inner join met.cl_precip_diaria p
     on e.c_clima = p.c_clima
-where p.metodo_i = 1 and p.fh_medida = %s;
+where p.metodo_i = 0 and p.fh_medida = %s;
+
 """
 day1, month1, year1 = 1, 1, 1985
-day2, month2, year2 = 31, 12, 2015
+day2, month2, year2 = 31, 12, 2010
 time_step = 'day'
 no_value: float = -9999.
 float_format: str = '0.1f'
