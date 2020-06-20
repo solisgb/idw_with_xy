@@ -11,24 +11,28 @@ Antes de ejecutar la app asegúrate de que rellenas correctamente los valores
 Al finalizar la ejecución el programa crea el fichero app.log con las
     incidencias de la ejecución
 """
+import littleLogging as logging
 
+xml_file: str = 'idw.xml'
+project: str = 'BDA_pd'
 
 if __name__ == "__main__":
 
     try:
         from time import time
         import traceback
-        from interpol import Interpolate
-        import interpolation_param as par
-        import littleLogging as logging
+        from interpol import IDW
+        from interpolation_param import Param
 
         startTime = time()
 
-        i = Interpolate(par.dbtype, par.db, par.select,
-                 par.day1, par.month1, par.year1,
-                 par.day2, par.month2, par.year2,
-                 par.time_step, par.no_value, par.float_format,
-                 par.variable_short_name, par.ylabel)
+        par = Param(xml_file, project)
+
+        i = IDW(par.dbtype, par.db, par.select,
+                par.day1, par.month1, par.year1,
+                par.day2, par.month2, par.year2,
+                par.time_step, par.no_value, par.float_format,
+                par.variable_short_name, par.ylabel)
 
         i.idw_serie_temporal(par.pathin, par.fpoints, par.skip_lines,
                              par.pathout,

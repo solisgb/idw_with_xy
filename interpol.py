@@ -24,7 +24,7 @@ PRINT_SECS: float = 5.
 COL_SEP = ';'
 
 
-class Interpolate():
+class IDW():
 
 
     def __init__(self, dbtype: str, db: str, select: str,
@@ -87,7 +87,7 @@ class Interpolate():
         if self.datei > self.datefin:
             self.datei, self.datefin = self.datefin, self.datei
         self.tstep_type, self.time_step = \
-        Interpolate.__time_step_get(time_step)
+        IDW.__time_step_get(time_step)
         self.no_value = no_value
         self.date_format = '%Y-%m-%d'
         self.float_format = float_format
@@ -137,24 +137,23 @@ class Interpolate():
 
         create_table1 = \
         """
-        create table if not exists interpolated (
+        create table if not exists IDWd (
         fid TEXT,
         fecha TEXT,
         value REAL,
         PRIMARY KEY (fid, fecha))"""
 
         insert1 = \
-        'insert into interpolated (fid, fecha, value) values(?, ?, ?);'
+        'insert into IDWd (fid, fecha, value) values(?, ?, ?);'
 
         start_time = time()
 
         # datos donde hay que interpolar
-        rows = Interpolate.__points2interpolate_get(join(pathin, fpoints),
-                                                    skip_lines)
+        rows = IDW.__read_file_points(join(pathin, fpoints), skip_lines)
         # array con los id de los puntos
         fidi = rows[:, 0]
         # array con las coord. (dim depende de num. cols. in rows)
-        xi = Interpolate.__xi_get(rows)
+        xi = IDW.__xi_get(rows)
         icols = [i for i in range(xi.shape[1]+1) ]
 
         # array para los valores interpolados
@@ -170,7 +169,10 @@ class Interpolate():
         cur1.execute(create_table1)
 
         t0 = PRINT_SECS
-        datei = self.datei
+        if self.tstep_type == 2:
+            datei = IDW.__month_lastday(self.datei)
+        else:
+            datei = self.datei
         while datei <= self.datefin:
             zi.fill(self.no_value)
             date_str = datei.strftime(self.date_format)
@@ -186,8 +188,7 @@ class Interpolate():
             data = np.array([[row[jcol] for jcol in icols] for row in data])
             tree = spatial.cKDTree(data[:, icols[0:-1]])
             dist, ii = tree.query(xi, k=kidw)
-            Interpolate.__idwcore(data[:, xi.shape[1]], dist, ii, power,
-                                  epsidw, zi)
+            IDW.__idwcore(data[:, xi.shape[1]], dist, ii, power, epsidw, zi)
             v = [float(z1) for z1 in zi]
             for i in range(len(fidi)):
                 cur1.execute(insert1, (fidi[i], date_str, v[i]))
@@ -234,7 +235,7 @@ class Interpolate():
         if self.tstep_type == 1:
             datei = datei + self.time_step
         elif self.tstep_type == 2:
-            datei = Interpolate.__addmonth_lastday(datei)
+            datei = IDW.__addmonth_lastday(datei)
         else:
             raise ValueError(f'tstep_type {self.tstep_type} ' +\
                              'no implementado')
@@ -257,16 +258,53 @@ class Interpolate():
 
 
     @staticmethod
-    def __points2interpolate_get(org, skip_lines):
+    def __read_file_points(org, skip_lines):
         """
         lee los puntos a interpolar de un fichero de texto y devuelve un
             numpy array
         """
-        with open(org, 'r') as f:
-            rows = np.array([row.split('\t')
-                             for i, row in enumerate(f.readlines())
-                             if i >=skip_lines])
+        from os.path import splitext
+        _, extension = splitext(org)
+
+        if extension.lower() == '.txt':
+            rows = IDW.__read_txt(org, skip_lines)
+        elif extension.lower() == '.csv':
+            rows = IDW.__read_csv(org, skip_lines)
+        else:
+            raise ValueError('El fichero de puntos a interpolar tiene ' +\
+                             'que tener la extensión txt o csv')
         return rows
+
+
+    @staticmethod
+    def __read_txt(org, skip_lines, separator='\t'):
+        """
+        leee los puntos a interpolar en formato txt
+        """
+        with open (org, 'r') as f:
+            lines = []
+            for i, line in enumerate(f):
+                if i < skip_lines:
+                    num = len(line.split(separator))
+                    continue
+                words = line.strip().split(separator)
+                if len(words) == num:
+                    lines.append(words)
+        return np.array(lines)
+
+
+    @staticmethod
+    def __read_csv(org, skip_lines):
+        """
+        leee los puntos a interpolar en formato csv
+        """
+        import csv
+        with open(org, newline='') as csvfile:
+            dialect = csv.Sniffer().sniff(csvfile.read(1024))
+            csvfile.seek(0)
+            reader = csv.reader(csvfile, dialect)
+            rows = [row for i, row in enumerate(reader) if i>=skip_lines]
+        return np.array(rows)
 
 
     @staticmethod
@@ -329,6 +367,24 @@ class Interpolate():
         return date(year, month, day)
 
 
+    @staticmethod
+    def __month_lastday(fecha):
+        """
+        Devuelve el último del mes
+        input:
+            fecha. date type
+        output:
+            date type
+        """
+        from datetime import date
+        from calendar import monthrange
+        year = fecha.year
+        month = fecha.month
+        day = monthrange(year, month)[1]
+        return date(year, month, day)
+
+
+
     def __write_interpolated_values(self, pathout: str, fpoints: str, cur1):
         """
         escribe los valores interpolados en el fichero dst
@@ -336,9 +392,9 @@ class Interpolate():
         cur1: cursor a una db sqlite
         """
         select1 = \
-        'select fid, fecha, value from interpolated order by fid, fecha;'
+        'select fid, fecha, value from IDWd order by fid, fecha;'
 
-        dst = Interpolate.__file_name_out(pathout, fpoints,
+        dst = IDW.__file_name_out(pathout, fpoints,
                                           self.variable_short_name, 'idw')
         f = open(dst, 'w')
         f.write(f'fid{COL_SEP}fecha{COL_SEP}valor\n')
@@ -360,10 +416,10 @@ class Interpolate():
         from datetime import datetime
 
         select = \
-        'select fid from interpolated group by fid order by fid;'
+        'select fid from IDWd group by fid order by fid;'
 
         select1 = \
-        'select fecha, value from interpolated where fid=? order by fecha;'
+        'select fecha, value from IDWd where fid=? order by fecha;'
 
         cur1.execute(select)
         fids = [row[0] for row in cur1.fetchall()]
@@ -376,8 +432,8 @@ class Interpolate():
             values = [row[1] for row in data]
             title = f'Punto interpolado {fid}'
             dst = join(pathout, fid+self.variable_short_name+'.png')
-            Interpolate.__xy_ts_plot_1g(title, fechas, values, self.ylabel,
-                                        dst)
+            IDW.__xy_ts_plot_1g(title, fechas, values, self.ylabel,
+                                dst)
 
 
     @staticmethod
@@ -425,9 +481,9 @@ class Interpolate():
         nfidi: número de puntos interpolados
         elapsed_time: tiempo transcurrido en segundos
         """
-        dst = Interpolate.__file_name_out(pathout, fpoints,
-                                          self.variable_short_name,
-                                          'idw_metadata')
+        dst = IDW.__file_name_out(pathout, fpoints,
+                                  self.variable_short_name,
+                                  'idw_metadata')
         with open(dst, 'w') as f:
             f.write(f'idw\n')
             f.write(f'Fecha inicial: {self.datei.strftime("%d/%m/%Y")}\n')

@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="yes"?>
+<!-- Proyectos que utiliza el programa idw
+dbtype: typo de db donde se leen los datos (ms_access, sqlite,
+											postgres)
+db:
+	si ms_access, sqlite, path completo al fichero de la base de datos
+	si postgres, nombre de la base datos. Debe existir el fichero de
+		texto pgdb.ini; el fichero debe contener al menos una sección
+		de nombre igual al de la db con el siguente contenido
+			[dbname]
+			host=ip_direction por ejemplo localhost, 127.0.0.1...
+			database=dbname
+			user=nombre_de_usuario
+			password=clave_acceso
+	Esta db debe tener al menos una tabla con al menos las siguientes
+	columnas: código de estación de tipo texto, text, varchar;
+	fecha de medida; valor en la fecha
+select: select que devuelve los datos con los que se va a hacer la
+	interpolación; los nombres de las tablas y las columnas pueden
+	variar entre db pero las columnas que tiene que devolver son
+	x, y, valor, siendo x, y las coordenadas de la estación de datos
+	(en coordenadas proyectadas) y valor el de la variable a
+	interpolar; esats 3 columnas debe ser de tipo eal;también debe
+	contener una cláusula where con la fecha como parámetro;
+	el formato del parámetro depende de la db: ms_access y sqlite es ?;
+	postgres es %s. los nombres de las columnas no importan
+	La tabla de datos debe ser una tabla temporal con un código de
+		estación de tipo texto, varchar, etc, una fecha y un valor;
+		para series mensuales el valor se graba en la última fecha del
+		mes
+day1, month1, year1: fecha inicial de la importación
+day2, month2, year2: fecha final de la importación
+time_step: paso de tiempo de la serie a interpolar. Puede ser day o
+	lastday_month
+no_value: valor que se grabarán las fechas que no se consigue
+	interpolar
+float_format: formato del valor interpolado; 0.0f, 0.1f, donde el
+	segundo dígito indica el número de decimales
+variable_short_name: nombre muy corto de la variable, este combre
+	identifica el valor interpolado y permite dirigir las
+	interpolaciones de variables distintas al mismo directorio sin que
+	se sobreesciban los resultados, ej.: p, pd, ca...
+ylabel: nombre corto de la variable que se presentarán los
+	ficheros xy de resultados, se recomienda que se incluyan las
+	unidades, ej: P mm, Pd mm, Pm dmm...
+pathin: directorio donde se ubica en fichero de puntos a interpolar (de la
+    forma r'path2dis'; r es un indicador para que se interprete \ como un
+    separados de carpetas)
+fpoints. Fichero con los puntos a interpolar. El fichero debe tener
+    extensión txt o csv y tener al menos 1 fila y 3 o 4 columnas de datos:
+        columna 1 el código del punto
+        columnas 2 y 3: coordenadas x e y
+        columna 4 (opcional): coordenada z
+    Si la extensión es txt el separador de columnas es \t (tabulador)
+    Si la extensión es csv debe tener un dialecto que reconozca python
+    El separador decimal es el punto, por ej. 1.2 y no debe haber separadores
+        de miles, por ej. 1000.3
+    skip_lines: número de lineas en el fichero de puntos a interpolar que no
+        se leen (cabecera, normalmente 1)
+    Si el fichero tiene 4 columnas el programa entiende que es una
+    interpolación 3D; si tiene 2 columnas será una interpolación en 2D
+    Compara las distancias en horizontal entre puntos con datos próximos y
+        el gradiente del alturas; si no es necesario no hagas interpolación 3D
+skip_lines: número de lineas en el fichero de puntos que no se leen (cabecera)
+pathout: directorio donde se grabarán los datos interpolados
+kidw: número de puntos con los que se realiza la interpolación (min 2)
+poweridw: potencia en el método idw (1/dist**powerid); normalmente 2.
+epsidw: si la distancia entre un punto con dato y un punto a interpolar es
+    menor que eps, se asigna la distancia del valor más próximo
+xygraph: se graban los gráficos de las series interpoladas: True o False
+ -->
+<idw>
+	<project name="BDA_pd">
+		<description>BDA precipitación diaria -DB Postgres</description>
+		<dbtype>postgres</dbtype>
+		<db>bda</db>
+		<day1>1</day1>
+		<month1>1</month1>
+		<year1>1970</year1>
+		<day2>31</day2>
+		<month2>12</month2>
+		<year2>2010</year2>		
+		<time_step>day</time_step>
+		<no_value>-9999.</no_value>
+		<float_format>0.1f</float_format>
+		<variable_short_name>pd</variable_short_name>
+		<ylabel>Pd dmm</ylabel>
+		<select>
+		select st_x(t1.geom ), st_y(t1.geom), t2.precip 
+		from met.cl_est_climat t1
+			left join met.cl_precip_diaria t2 using (c_clima)
+		where t2.fh_medida =%s
+		</select>
+		<pathin>H:\\off\\balan</pathin>
+		<fpoints>centroids.txt</fpoints>
+		<skip_lines>1</skip_lines>
+		<pathout>H:\\off\\balan\\pd</pathout>
+		<kidw>8</kidw>
+		<poweridw>2.0</poweridw>
+		<epsidw>0.5</epsidw>
+		<xygraph>False</xygraph>		
+	</project>
+</idw>
