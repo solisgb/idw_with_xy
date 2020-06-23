@@ -384,7 +384,6 @@ class IDW():
         return date(year, month, day)
 
 
-
     def __write_interpolated_values(self, pathout: str, fpoints: str, cur1):
         """
         escribe los valores interpolados en el fichero dst
@@ -501,3 +500,24 @@ class IDW():
             if a:
                 f.write(f'incidencias\n')
                 f.write(f'{a}\n')
+
+
+def merge_ts01(orgs: tuple, header: tuple, dst: str, separator: str =';'):
+
+    dst = open(dst, 'w')
+    dst.write(separator.join(header) + '\n')
+
+    readers = [open(org1, 'r') for org1 in orgs]
+    for i in range(2):
+        lines = [ f.readline().strip() for f in readers]
+
+    while lines[0] != '':
+        words1 = lines[0].split(separator)[0:3]
+        words2 = [line1.split(separator)[2] for line1 in lines[1:]]
+        words = words1 + words2
+        dst.write(separator.join(words) + '\n')
+        lines = [ f.readline().strip() for f in readers]
+
+    for f1 in readers:
+        f1.close()
+    dst.close()

@@ -14,7 +14,7 @@ Al finalizar la ejecución el programa crea el fichero app.log con las
 import littleLogging as logging
 
 xml_file: str = 'idw.xml'
-project: str = 'BDA_pd'
+project: str = 'BDA_tdmax'
 
 if __name__ == "__main__":
 

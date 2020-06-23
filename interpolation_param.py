@@ -143,7 +143,7 @@ class Param():
         self.kidw = int(prj.find('kidw').text)
         self.poweridw = float(prj.find('poweridw').text)
         self.epsidw = float(prj.find('epsidw').text)
-        if prj.find('xygraph').text.lower.strip() in ('true', '1'):
+        if prj.find('xygraph').text.lower().strip() in ('true', '1'):
             self.xygraph = True
         else:
             self.xygraph = False
