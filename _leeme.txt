@@ -1,4 +1,29 @@
-11/03/2020
-deriva de rbf pero solo idw
-incorpora selección de tipo de base de datos
-incorpora una clase
+19/07/2020
+Programa para hacer interpolaciones en puntos sin datos por el método idw
+
+El programa no tiene interfaz gráfica y está destinado a ser manejado por
+	un técnico, mejor si tiene conocimientos de python y xml
+
+El módulo con las funciones de cálculo se llama idw.py
+
+Hay 4 módulos que ejecutan acciones relacionadas con la interpolación idw
+
+1. tests_idw.py
+En este módulo se comprueba con unos datos de prueba que las funciones en 
+idw.py dan resultados correctos
+
+2. interpol.py
+En este módulo se interpola en una serie de puntos una serie temporal
+Los datos están almacenados en una base de datos, que puede ser postgres o
+	sqlite
+La base de datos tiene que tener las coordenadas de las estaciones y los
+	datos temporales a escala diaria o mensual
+Lee cuidadosamente el fichero xml que lo acompaña con las instrucciones
+	para rellenar los parámetros requeridos en la interpolación
+
+3. xmerge_ts.py
+Permite unir en un fichero los datos de los puntos interpolados para distintas
+		variables (típicamente precipitación, temperatura máxima y mínima)
+		
+4. ts_2_db.py
+Carga los resultados de la interpolación en una db sqlite

@@ -5,7 +5,7 @@ dbtype: typo de db donde se leen los datos (ms_access, sqlite,
 db:
 	si ms_access, sqlite, path completo al fichero de la base de datos
 	si postgres, nombre de la base datos. Debe existir el fichero de
-		texto pgdb.ini; el fichero debe contener al menos una secci√≥n
+		texto pgdb.ini; el fichero debe contener al menos una secciÛn
 		de nombre igual al de la db con el siguente contenido
 			[dbname]
 			host=ip_direction por ejemplo localhost, 127.0.0.1...
@@ -13,67 +13,67 @@ db:
 			user=nombre_de_usuario
 			password=clave_acceso
 	Esta db debe tener al menos 2 tablas
-		Tabla 1, columnas: c√≥digo de estaci√≥n de tipo texto;
-		Tabla 2, columnas: c√≥digo de estaci√≥n de tipo texto
+		Tabla 1, columnas: identificador de estaciÛn de tipo texto;
+		Tabla 2, columnas: identificador de estaciÛn de tipo texto
 			fecha
-			valor de la variable que se qiere interpolar
+			valor de la variable que se quiere interpolar
 			IMPORTANTE
-			Para series mensuales el valor se graba en la √∫ltima fecha del
-			mes
+			Para series mensuales el valor debe estar almacenada como fecha
+			el ˙ltimo dÌa del mes  
 select: select que devuelve los datos con los que se va a hacer la
-	interpolaci√≥n para una fecha determinada; la select debe tener una
-	cl√°usula where con un par√°metro para la fecha; el formato del
-	par√°metro depende de la db: ms_access y sqlite es ?; postgres es %s
+	interpolaciÛn para una fecha determinada; la select debe tener una
+	cl·usula where con un par·metro para la fecha; el formato del
+	par·metro depende de la db: ms_access y sqlite es ?; postgres es %s
 	Los nombres de las tablas y las columnas pueden
 	variar entre db pero las columnas que tiene que devolver son
-	x, y, valor, siendo x, y las coordenadas de la estaci√≥n de datos
+	x, y, valor, siendo x, y las coordenadas de la estaciÛn de datos
 	(en coordenadas proyectadas) y valor el de la variable a
 	interpolar; estas 3 columnas debe ser de tipo real
 	los nombres de las columnas no importan
-	Aseg√∫rate que la select siempre devuelve un dato por punto y fecha
+	Aseg˙rate que la select siempre devuelve un dato por punto y fecha
 		(no hay valores nulos)
-day1, month1, year1: fecha inicial de la importaci√≥n, incluida
-day2, month2, year2: fecha final de la importaci√≥n, incluida
+day1, month1, year1: fecha inicial de la importaciÛn, incluida
+day2, month2, year2: fecha final de la importaciÛn, incluida
 time_step: paso de tiempo de la serie a interpolar. La tabla 2 puede contener
-	datos diarios o mensuales. La variable time_step indica el pasa de d√≠as
+	datos diarios o mensuales. La variable time_step indica el pasa de dÌas
 	entre 2 datos consecutivos y puede tener solo 2 valores: day, lastday_month
-no_value: valor que se grabar√°n las fechas que no se consigue
+no_value: valor que se grabar·n las fechas que no se consigue
 	interpolar; en esa fecha no hay datos
 float_format: formato del valor interpolado; 0.0f, 0.1f, donde el
-	segundo d√≠gito indica el n√∫mero de decimales
+	segundo dÌgito indica el n˙mero de decimales
 variable_short_name: nombre muy corto de la variable, este combre
 	identifica el valor interpolado y permite dirigir las
 	interpolaciones de variables distintas al mismo directorio sin que
 	se sobreesciban los resultados, ej.: pd, pm, tmaxm
-ylabel: nombre corto de la variable que se presentar√°n los
+ylabel: nombre corto de la variable que se presentar· en los
 	ficheros xy de resultados, se recomienda que se incluyan las
 	unidades, ej: P mm, Pd mm, Pm dmm...
 pathin: directorio donde se ubica en fichero de puntos a interpolar (de la
     forma r'path2dis'; r es un indicador para que se interprete \ como un
     separados de carpetas)
 fpoints. Fichero con los puntos a interpolar. El fichero debe tener
-    extensi√≥n txt o csv y tener al menos 1 fila y 3 o 4 columnas de datos:
-        columna 1 el c√≥digo del punto
+    extensiÛn txt o csv y tener al menos 1 fila y 3 o 4 columnas de datos:
+        columna 1 el identidicador del punto
         columnas 2 y 3: coordenadas x e y
         columna 4 y siguientes (opcional): no se leen
-    Si la extensi√≥n es txt el separador de columnas es \t (tabulador)
-    Si la extensi√≥n es csv debe tener un dialecto que reconozca python
+    Si la extensiÛn es txt el separador de columnas es \t (tabulador)
+    Si la extensiÛn es csv debe tener un dialecto que reconozca python
     El separador decimal es el punto (nunca la ,), por ej. 1.2 y no debe haber
 		separadores de miles, por ej. 1000.3
-    skip_lines: n√∫mero de lineas en el fichero de puntos a interpolar que no
+    skip_lines: n˙mero de lineas en el fichero de puntos a interpolar que no
         se leen (cabecera, normalmente 1)
 pathout: directorio donde se grabar√°n los datos interpolados
-kidw: n√∫mero de puntos con los que se realiza la interpolaci√≥n (min 2)
-poweridw: potencia en el m√©todo idw (1/dist**powerid); normalmente 2.
+kidw: n˙mero de puntos con los que se realiza la interpolaciÛn (min 2)
+poweridw: potencia en el mÈtodo idw (1/dist**powerid); normalmente 2.
 epsidw: si la distancia entre un punto con dato y un punto a interpolar es
-    menor que epsidw, se asigna la distancia del valor m√°s pr√≥ximo
-	debe ser un valor > 0, pues en caso contrario la distancia ser√≠a 0
-		y 1/distancia no es v√°lido
-xygraph: se graban los gr√°ficos de las series interpoladas: True o False
+    menor que epsidw, se asigna la distancia del valor m·s prÛximo
+	debe ser un valor > 0, pues en caso contrario la distancia ser· 0
+		y 1/distancia no es v·lido
+xygraph: se graban los gr·ficos de las series interpoladas: True o False
 -->
 <idw>
 	<project name="BDA_pd">
-		<description>BDA precipitaci√≥n diaria</description>
+		<description>BDA precipitaciÛn diaria</description>
 		<dbtype>postgres</dbtype>
 		<db>bda</db>
 		<day1>1</day1>
@@ -103,7 +103,7 @@ xygraph: se graban los gr√°ficos de las series interpoladas: True o False
 		<xygraph>False</xygraph>		
 	</project>
 	<project name="BDA_tdmin">
-		<description>BDA temperatura m√≠nima diaria</description>
+		<description>BDA temperatura mÌnima diaria</description>
 		<dbtype>postgres</dbtype>
 		<db>bda</db>
 		<day1>1</day1>
@@ -133,7 +133,7 @@ xygraph: se graban los gr√°ficos de las series interpoladas: True o False
 		<xygraph>True</xygraph>		
 	</project>
 	<project name="BDA_tdmax">
-		<description>BDA temperatura m√°xima diaria</description>
+		<description>BDA temperatura m·xima diaria</description>
 		<dbtype>postgres</dbtype>
 		<db>bda</db>
 		<day1>1</day1>
@@ -163,7 +163,7 @@ xygraph: se graban los gr√°ficos de las series interpoladas: True o False
 		<xygraph>True</xygraph>		
 	</project>
 	<project name="QCC_pd">
-		<description>PH pdiaria Q Campo Cartagena</description>
+		<description>PH precipitaciÛn Q Campo Cartagena dmm/d</description>
 		<dbtype>postgres</dbtype>
 		<db>ipa</db>
 		<day1>1</day1>
@@ -189,10 +189,10 @@ xygraph: se graban los gr√°ficos de las series interpoladas: True o False
 		<kidw>8</kidw>
 		<poweridw>2.0</poweridw>
 		<epsidw>0.5</epsidw>
-		<xygraph>False</xygraph>		
+		<xygraph>True</xygraph>		
 	</project>
-	<project name="QCC_tmax d">
-		<description>PH pdiaria Q Campo Cartagena</description>
+	<project name="QCC_tmax_d">
+		<description>PH temperatura m·xima diaria Q Campo Cartagena d∫C</description>
 		<dbtype>postgres</dbtype>
 		<db>ipa</db>
 		<day1>1</day1>
@@ -204,7 +204,7 @@ xygraph: se graban los gr√°ficos de las series interpoladas: True o False
 		<time_step>day</time_step>
 		<no_value>-9999.</no_value>
 		<float_format>0.1f</float_format>
-		<variable_short_name>pd</variable_short_name>
+		<variable_short_name>tmaxd</variable_short_name>
 		<ylabel>Tmax dmm/d</ylabel>
 		<select>
 		select st_x(p.geom), st_y(p.geom), d.tmax 
@@ -215,9 +215,38 @@ xygraph: se graban los gr√°ficos de las series interpoladas: True o False
 		<fpoints>point.csv</fpoints>
 		<skip_lines>1</skip_lines>
 		<pathout>H:\\off\\phdhs2127\\recarga\\cc_q\\meteo_out</pathout>
-		<kidw>8</kidw>
+		<kidw>6</kidw>
 		<poweridw>2.0</poweridw>
 		<epsidw>0.5</epsidw>
-		<xygraph>False</xygraph>		
+		<xygraph>True</xygraph>		
+	</project>
+	<project name="QCC_tmin_d">
+		<description>PH temperatura m·xima diaria Q Campo Cartagena d∫C</description>
+		<dbtype>postgres</dbtype>
+		<db>ipa</db>
+		<day1>1</day1>
+		<month1>1</month1>
+		<year1>1985</year1>
+		<day2>30</day2>
+		<month2>9</month2>
+		<year2>2019</year2>		
+		<time_step>day</time_step>
+		<no_value>-9999.</no_value>
+		<float_format>0.1f</float_format>
+		<variable_short_name>tmind</variable_short_name>
+		<ylabel>Tmin dmm/d</ylabel>
+		<select>
+		select st_x(p.geom), st_y(p.geom), d.tmin 
+		from met.pexistencias p inner join met.dia_od d on (p.indic = d.indicativo )
+		where d.tmin is not null and d.fecha =%s
+		</select>
+		<pathin>H:\\off\\phdhs2127\\recarga\\cc_q</pathin>
+		<fpoints>point.csv</fpoints>
+		<skip_lines>1</skip_lines>
+		<pathout>H:\\off\\phdhs2127\\recarga\\cc_q\\meteo_out</pathout>
+		<kidw>6</kidw>
+		<poweridw>2.0</poweridw>
+		<epsidw>0.5</epsidw>
+		<xygraph>True</xygraph>		
 	</project>	
 </idw>

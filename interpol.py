@@ -8,26 +8,24 @@ implementa la interpolación de series temporales en puntos sin datos utilizando
     el método idw
 también se puede utilizar para rellenar estaciones; si un punto a interpolar
     coincide en coordenada con un punto con dato, el punto a interpolar tendrá
-    el valor del punto con dato -él  mismo-
+    el valor del punto con dato -él mismo-
 """
-from datetime import date
-import matplotlib.pyplot as plt
-import matplotlib as mpl
 import numpy as np
-from scipy import spatial
 import littleLogging as logging
-
-# paso de tiempo en las series temporales
-time_steps = ('day', 'lastday_month')
-# al interpolar series temporales imprime fecha cada
-PRINT_SECS: float = 5.
-# separador de columnas en el fichero de resultados
-COL_SEP = ';'
 
 
 class IDW():
 
-    table_name_interpolated_values = 'ivalues'
+    table_name_interpolated_values: str = 'ivalues'
+    # paso de tiempo en las series temporales
+    time_steps: tuple = ('day', 'lastday_month')
+    # separador de columnas en el fichero de resultados
+    COL_SEP: str = ';'
+    # al interpolar series temporales imprime fecha cada
+    PRINT_SECS: float = 5.
+    # fichero de puntos en los que se realiza la interpolación
+    file_point: str = 'interpolated_points'
+
 
     def __init__(self, xml_org: str, project: str):
         """
@@ -41,7 +39,9 @@ class IDW():
 
 
     def _write_params(self):
+        from datetime import date
         import xml.etree.ElementTree as ET
+
         tree = ET.parse(self.xml_org)
         root = tree.getroot()
         prj = None
@@ -67,6 +67,9 @@ class IDW():
             self.datei, self.datefin = self.datefin, self.datei
         self.date_format = '%Y-%m-%d'
         time_step = prj.find('time_step').text
+        if time_step not in IDW.time_steps:
+            raise ValueError(f'time_step {time_step} debe estar en: ' +\
+                             f'{",".join(IDW.time_steps)}')
         self.tstep_type, self.time_step = IDW.__time_step_get(time_step)
         self.no_value = float(prj.find('no_value').text)
         self.float_format = prj.find('float_format').text
@@ -91,11 +94,11 @@ class IDW():
         Interpolación de una serie temporal en una serie de puntos sin datos
         xygraph: True si se graba un gráficos con cada punto interpolado
         """
-        from os.path import join
         import sqlite3
+        from os.path import join
         from time import time
+        from scipy import spatial
         from db_connection import con_get
-
         import idw
 
         create_table1 = \
@@ -133,19 +136,19 @@ class IDW():
         cur1 = con1.cursor()
         cur1.execute(create_table1)
 
-        t0 = PRINT_SECS
+        t0 = IDW.PRINT_SECS
         if self.tstep_type == 2:
             datei = IDW.__month_lastday(self.datei)
         else:
             datei = self.datei
 
         # los puntos con datos cambian de una fecha a otra por lo que hay que
-        # hacer una select para cada fecha
-
+        # hacer una select para cada fecha; esto hace que el proceso sea
+        # sea largo para series temporales largas
         date_nodata = []
         while datei <= self.datefin:
             date_str = datei.strftime(self.date_format)
-            if time() - t0 > PRINT_SECS:
+            if time() - t0 > IDW.PRINT_SECS:
                 t0 = time()
                 print(date_str)
 
@@ -172,7 +175,7 @@ class IDW():
             # idw interpolation
             idw.idwn(self.poweridw, dist, values, self.epsidw, zi)
 
-            # insert data in sqlite
+            # insert interpolated values in sqlite
             for i in range(len(fidi)):
                 cur1.execute(insert1, (fidi[i], date_str, float(zi[i])))
 
@@ -180,16 +183,24 @@ class IDW():
 
         con.close()
         elapsed_time = time() - start_time
-        print(f'La interpolación tardó {elapsed_time:0.1f} s')
+        print(f'La interpolación idw tardó {elapsed_time:0.1f} s')
 
         con1.commit()
 
-        self._fill_nodata(xi, date_nodata, cur1)
+        # las fechas sin datos se tratan de interpolar con medianas
+        missed = self._fill_with_median(fidi, date_nodata,
+                                        con1, cur1, insert1)
 
+        # graba interpolación en ficheros de texto
         self.__write_interpolated_values(cur1)
 
-        self.__write_idw_metadata(fidi.size, elapsed_time)
+        # graba fichero con los metadatos de la interpolación
+        self.__write_idw_metadata(fidi.size, elapsed_time, missed)
 
+        # graba el fichero de puntos donde se realizó la interpolación
+        self.__write_interpolated_points(fidi, xi)
+
+        # graba los gráficos
         if xygraph:
             self.__xy(cur1)
 
@@ -345,6 +356,7 @@ class IDW():
 
 
     def __write_interpolated_values(self, cur1):
+        from os.path import join
         """
         escribe los valores interpolados en el fichero dst
         args
@@ -355,11 +367,10 @@ class IDW():
         from {IDW.table_name_interpolated_values}
         order by fid, fecha"""
 
-        dst = IDW.__file_name_out(self.pathout, self.fpoints,
-                                  self.variable_short_name, 'idw')
+        dst = join(self.pathout, self.variable_short_name+'_idw.csv')
         f = open(dst, 'w')
-        f.write(f'fid{COL_SEP}fecha{COL_SEP}valor\n')
-        cadena = '{}' + COL_SEP + '{}' + COL_SEP + \
+        f.write(f'fid{IDW.COL_SEP}fecha{IDW.COL_SEP}valor\n')
+        cadena = '{}' + IDW.COL_SEP + '{}' + IDW.COL_SEP + \
         '{:' + self.float_format + '}\n'
         cur1.execute(select1)
         for row in cur1.fetchall():
@@ -368,13 +379,13 @@ class IDW():
 
 
     def __xy(self, cur1):
-        from os.path import join
         """
         graba los gráficos xy de las series interpoladas
         args
         cur1: objeto sqlite cursor
         """
         from datetime import datetime
+        from os.path import join
 
         select = \
         f"""select fid
@@ -383,7 +394,7 @@ class IDW():
         order by fid"""
 
         select1 = \
-        """select fecha, value
+        f"""select fecha, value
         from {IDW.table_name_interpolated_values}
         where fid=?
         order by fecha"""
@@ -413,6 +424,9 @@ class IDW():
         y: lista de valores interpolados float
         dst: nombre fichero destino (debe incluir la extensión png)
         """
+        import matplotlib.pyplot as plt
+        import matplotlib as mpl
+
         # parámetros específicos
         mpl.rc('font', size=8)
         mpl.rc('axes', labelsize=8, titlesize= 10, grid=True)
@@ -436,7 +450,8 @@ class IDW():
         plt.rcdefaults()
 
 
-    def __write_idw_metadata(self, nfidi: int, elapsed_time: float):
+    def __write_idw_metadata(self, nfidi: int, elapsed_time: float,
+                             missed: list):
         """
         Graba el fichero de metadatos de la interpolación
         args
@@ -459,29 +474,94 @@ class IDW():
             f.write(f'db de los datos, {self.db}\n')
             f.write(f'Núm. de puntos interpolados {nfidi:d}\n')
             f.write(f'Tiempo transcurrido, {elapsed_time:0.1f} s\n')
-            a = logging.get_as_str()
-            if a:
-                f.write(f'incidencias\n')
+            if missed:
+                f.write(f'No se han podido interpolar\n')
+                a = '\n'.join(missed)
                 f.write(f'{a}\n')
 
 
-    #TODO
-    def _fill_nodata(self, xi, date_nodata, cur1):
+    def _fill_with_median(self, fidi, date_nodata, con, cur, insert):
+        """
+        fill not interpolated values using idw in dates date_nodata
+        using medians
+        """
+
         select1 = \
         """select value
         from {IDW.table_name_interpolated_values}
-        where """
+        where fid=?
+        order by value"""
 
+        select2 = \
+        """select value
+        from {IDW.table_name_interpolated_values}
+        order by value
+        """
 
         if len(date_nodata) == 0:
-            return
-        values = [None for i in range(12)]
+            return []
+
+        med = np.empty((fidi.size, 12), np.float32)
+        med[:] = np.NAN
+        missed = []
+
         for date1 in date_nodata:
-            i = int(date1[5:7])
+            imonth = int(date1[5:7]) - 1
+            for i, fidi1 in enumerate(fidi):
+                if np.isnan(med[i, imonth]):
+                    IDW._median_set(cur, select1, imonth, i, med, fidi1)
+                    if np.isnan(med[i, imonth]):
+                        IDW._median_set(cur, select2, imonth,
+                                        i, med)
+                        if np.isnan(med[i, imonth]):
+                            logging.append(f'{date1} no median available ' +\
+                                           f'for point {fidi1}', False)
+
+                if not np.isnan(med[i, imonth]):
+                    cur.execute(insert, (fidi1, date1, float(med[i, imonth])))
+                    a = f'point {fidi1}, fecha {date1} interpolated with ' +\
+                    'median'
+                    logging.append(f'{a}', False)
+                else:
+                    missed.append(f'point {fidi1}, fecha {date1}')
+        con.commit()
+        return missed
 
 
-def merge_ts01(orgs: tuple, header: tuple, dst: str, separator: str =';'):
+    @staticmethod
+    def _median_set1(cur, select, imonth, i, med, fidi1=None):
+        """
+        calculates the median using the data retrieved by select
+        """
+        if fidi1 == None:
+            cur.execute(select)
+        else:
+            cur.execute(select,(fidi1,))
+        x = np.array([row[0] for row in cur.fetchall()],
+                      np.float32)
+        if x.size > 0:
+            med[i, imonth] = np.median(x)
 
+
+    def __write_interpolated_points(self, fidi, xi):
+        """
+        saves interpolated points in the directory where the interpolated
+            results are saved
+        """
+        from os.path import join
+        dst = join(self.pathout,
+                   IDW.file_point+'_'+self.variable_short_name+'.csv')
+        np.savetxt(dst, np.transpose([fidi, xi[:,0], xi[:,1]]),
+                   header='fid,x,y',delimiter=';')
+
+
+def merge_idw_output_files(orgs: tuple, header: tuple, dst: str,
+                           separator: str =';'):
+    """
+    if you execute idw interpolation for several variables in the same
+        date range, you can merge the output files in only one, but only
+        in case all dates in date range would have been interpolated
+    """
     dst = open(dst, 'w')
     dst.write(separator.join(header) + '\n')
 
@@ -499,3 +579,51 @@ def merge_ts01(orgs: tuple, header: tuple, dst: str, separator: str =';'):
     for f1 in readers:
         f1.close()
     dst.close()
+
+
+def output_files_2db(dir_org: str, orgs: dict, dst: str, separator: str =';'):
+    """
+    export output files to sqlite
+    """
+    from os.path import join
+    import sqlite3
+
+    mydb = 'output_idw.db'
+
+    con = sqlite3.connect(join(dst, mydb))
+    cur = con.cursor()
+
+    for k, v in orgs.items():
+        print(k)
+        cur.execute(f'drop table if exists {k}')
+        cur.execute(f'drop table if exists {k}_point')
+        cur.execute(f'create table if not exists {k} (' +\
+                    'fid TEXT, fecha TEXT, value REAL,' +\
+                    'primary key (fid, fecha))')
+        cur.execute(f'create table if not exists {k}_point (' +\
+                    'fid TEXT, x REAL, y REAL,' +\
+                    'primary key (fid))')
+
+        f = open(join(dir_org, v[0]))
+        for i, line in enumerate(f):
+            if i == 0:
+                continue
+            w = line.split(separator)
+            cur.execute(f'insert into {k}_point (fid, x, y) values(?, ?, ?)',
+                        (w[0], float(w[1]), float(w[2])))
+
+        f.close()
+
+        f = open(join(dir_org, v[1]))
+        for i, line in enumerate(f):
+            if i == 0:
+                continue
+            w = line.split(separator)
+            cur.execute(f'insert into {k} (fid, fecha, value) values(?, ?, ?)',
+                        (w[0], w[1], float(w[2])))
+
+        f.close()
+
+
+    con.commit()
+    con.close()

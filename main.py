@@ -14,6 +14,9 @@ Al finalizar la ejecución el programa crea el fichero app.log con las
     incidencias de la ejecución
 Antes de ejecutar la app rellena los contenidos de las variables
     xml_file, project y xygraph
+Muchas veces en el mismo conjunto de puntos quieres interpolar varias variables
+    (o varios proyectos en el mismo fichero xml); puedes colocar todos los
+    nombres de proyecto en una lista y ejecutarlos todos a la vez
 """
 from time import time
 import traceback
@@ -22,8 +25,8 @@ from interpol import IDW
 import littleLogging as logging
 
 xml_file: str = 'idw.xml'
-project: str = 'QCC_pd'
-xygraph: bool = False
+project: str = 'QCC_tmax_d'
+xygraph: bool = True
 
 if __name__ == "__main__":
 
@@ -31,9 +34,9 @@ if __name__ == "__main__":
 
         startTime = time()
 
-        i = IDW(xml_file, project)
-
-        i.idw_ts(xygraph)
+        for project in ("QCC_pd", "QCC_tmax_d", "QCC_tmin_d"):
+            i = IDW(xml_file, project)
+            i.idw_ts(xygraph)
 
         xtime = time() - startTime
         print(f'El script tardó {xtime:0.1f} s')
